@@ -53,7 +53,6 @@ ENV_FILE = BASE_DIR / ".env"
 COOKIE_ROOT = BASE_DIR / "cookies"
 DOWNLOAD_DIR = Path(os.getenv("DOWNLOAD_DIR", str(BASE_DIR / "downloads")))
 
-
 def load_env_file():
     if not ENV_FILE.is_file():
         return
@@ -68,7 +67,6 @@ def load_env_file():
             value.strip().strip('"').strip("'"),
         )
 
-
 load_env_file()
 
 API_ID = int(os.getenv("API_ID", "0"))
@@ -82,6 +80,13 @@ PROGRESS_INTERVAL = max(1.5, float(os.getenv("PROGRESS_INTERVAL", "2.5")))
 
 # Cloudflare WARP SOCKS5 Proxy
 YTDLP_PROXY = os.getenv("YTDLP_PROXY", "socks5://127.0.0.1:40000").strip()
+
+# ==================== TURBO DOWNLOAD ENGINE CONFIG ====================
+DOWNLOAD_WORKERS = max(2, int(os.getenv("DOWNLOAD_WORKERS", "8")))
+DOWNLOAD_CHUNK_SIZE = max(64 * 1024, int(os.getenv("DOWNLOAD_CHUNK_SIZE", str(1024 * 1024))))
+SPEED_PROBE_BYTES = 1 * 1024 * 1024      # 1MB probe per pathway
+PARALLEL_MIN_SIZE = 4 * 1024 * 1024      # files >= 4MB use multi-connection
+PART_RETRIES = 3
 
 if not API_ID or not API_HASH or not BOT_TOKEN:
     raise SystemExit(f"Missing API_ID, API_HASH or TELEGRAM_BOT_TOKEN in {ENV_FILE}")
@@ -134,10 +139,8 @@ active_jobs: dict[int, dict] = {}
 active_lock = threading.Lock()
 last_edit = {}
 
-
 class JobCancelledError(Exception):
     """Raised when a user forcefully cancels an active download/upload job."""
-
 
 def trim_memory():
     """Keep memory footprint tiny on 1GB RAM VPS."""
@@ -169,7 +172,6 @@ def cleanup_job_files(job_id: str):
         except OSError as exc:
             log.debug("Failed to delete %s: %s", path, exc)
 
-
 def _low_priority_preexec():
     """
     Set new process group AND lower CPU/IO priority (nice 15) so FFmpeg/curl
@@ -180,7 +182,6 @@ def _low_priority_preexec():
         os.nice(15)
     except OSError:
         pass
-
 
 def force_kill_process_tree(proc: subprocess.Popen | None):
     if proc is None:
@@ -196,7 +197,6 @@ def force_kill_process_tree(proc: subprocess.Popen | None):
         proc.kill()
     except Exception:
         pass
-
 
 def cancel_user_job(uid: int) -> bool:
     with active_lock:
@@ -224,7 +224,6 @@ def cancel_user_job(uid: int) -> bool:
 
     trim_memory()
     return True
-
 
 def run_tracked_subprocess(cmd: list[str], uid: int, timeout: int = 900):
     with active_lock:
@@ -354,7 +353,6 @@ def probe_video_metadata(video_path: Path) -> dict:
 
     return meta
 
-
 def ensure_playable_seekable_mp4(video_path: Path, job_id: str, uid: int) -> Path:
     if not video_path.is_file() or video_path.stat().st_size < 10 * 1024:
         raise RuntimeError(
@@ -430,7 +428,6 @@ def ensure_playable_seekable_mp4(video_path: Path, job_id: str, uid: int) -> Pat
 
     return video_path
 
-
 def generate_video_thumbnail(
     video_path: Path,
     job_id: str,
@@ -469,7 +466,6 @@ def is_tiktok_url(url: str) -> bool:
     host = (urlparse(url).hostname or "").lower()
     return host == "tiktok.com" or host.endswith(".tiktok.com")
 
-
 def is_known_ytdlp_site(url: str) -> bool:
     """Identify sites with fast native yt-dlp extractors vs generic KVS/HTML sites."""
     host = (urlparse(url).hostname or "").lower()
@@ -478,17 +474,15 @@ def is_known_ytdlp_site(url: str) -> bool:
         "twitter.com", "x.com", "reddit.com", "redd.it", "vimeo.com",
         "dailymotion.com", "twitch.tv", "soundcloud.com", "pinterest.com",
         "pin.it", "bilibili.com", "vk.com", "ok.ru", "streamable.com",
-        "rumble.com", "bitchute.com", "PORNHUB.COM".lower(), "xvideos.com",
+        "rumble.com", "bitchute.com", "pornhub.com", "xvideos.com",
         "xnxx.com", "xhamster.com", "spankbang.com", "eporner.com", "redtube.com",
         "youporn.com", "tube8.com", "thumbzilla.com",
     )
     return any(host == d or host.endswith("." + d) for d in known)
 
-
 def is_ad_or_junk_url(url: str) -> bool:
     low = url.lower()
     return any(kw in low for kw in AD_URL_KEYWORDS)
-
 
 def normalize_url(url: str) -> str:
     url = url.strip()
@@ -525,7 +519,6 @@ def normalize_url(url: str) -> str:
 
     return url
 
-
 def valid_url(url: str) -> bool:
     try:
         parsed = urlparse(url.strip())
@@ -536,7 +529,6 @@ def valid_url(url: str) -> bool:
         )
     except Exception:
         return False
-
 
 def normalize_domain(value: str):
     value = value.strip().lower()
@@ -556,7 +548,6 @@ def normalize_domain(value: str):
 
     return value
 
-
 def strip_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m|\[[0-9;]*m", "", text)
 
@@ -573,7 +564,6 @@ def cookie_profile_dir(uid: int) -> Path:
         pass
 
     return folder
-
 
 def parse_cookie_file(path: Path) -> list[dict]:
     records = []
@@ -624,7 +614,6 @@ def parse_cookie_file(path: Path) -> list[dict]:
 
     return records
 
-
 def cookie_domain_matches(cookie_domain, include_subdomains, host):
     cookie_domain = cookie_domain.lstrip(".").lower()
     host = (host or "").strip(".").lower()
@@ -636,7 +625,6 @@ def cookie_domain_matches(cookie_domain, include_subdomains, host):
         return True
 
     return False
-
 
 def cookie_profiles(uid: int) -> list[dict]:
     result = []
@@ -666,7 +654,6 @@ def cookie_profiles(uid: int) -> list[dict]:
             })
 
     return result
-
 
 def cookie_file_for_url(uid: int, url: str):
     url = normalize_url(url)
@@ -718,7 +705,6 @@ def cookie_file_for_url(uid: int, url: str):
         )
     return selected
 
-
 def cookie_options_for_url(uid: int, url: str) -> dict:
     path = cookie_file_for_url(uid, url)
 
@@ -745,8 +731,9 @@ def make_ytdlp_options(uid, url, extra=None, fast_fetch=False, use_proxy=True):
         "retries": 1 if fast_fetch else 3,
         "extractor_retries": 1 if fast_fetch else 2,
         "fragment_retries": 3,
-        # 1GB RAM VM එකේ CPU සහ Network තදබදය අවම කිරීමට concurrent_fragment_downloads=2
-        "concurrent_fragment_downloads": 2,
+        # TURBO: HLS/DASH fragments 8 parallel + 10MB HTTP chunks (was 2 fragments)
+        "concurrent_fragment_downloads": max(1, int(os.getenv("YTDLP_CONCURRENT_FRAGMENTS", "8"))),
+        "http_chunk_size": 10 * 1024 * 1024,
         "format_sort": ["vcodec:h264", "acodec:aac", "ext:mp4:m4a"],
         "http_headers": {
             "User-Agent": DEFAULT_UA,
@@ -802,7 +789,6 @@ def infer_format_height(fmt: dict) -> int:
 
     return 0
 
-
 def unwrap_main_entry(info: dict) -> dict:
     if not info:
         return info
@@ -830,7 +816,6 @@ def unwrap_main_entry(info: dict) -> dict:
         ),
     )
     return best_entry
-
 
 def quality_options(info: dict) -> list[tuple[str, str]]:
     info = unwrap_main_entry(info)
@@ -880,7 +865,6 @@ def quality_options(info: dict) -> list[tuple[str, str]]:
         result.append((f"{fmt_id}|{height}", label))
 
     return result[:12]
-
 
 def build_video_format_selector(info: dict, selection: str) -> str:
     if selection == "best" or not selection:
@@ -962,7 +946,6 @@ def decrypt_kvs_url(real_url: str, license_code: str) -> str:
 
     return "/".join(parts)
 
-
 def extract_kvs_flashvars(page_html: str, base_url: str) -> list[tuple[str, int, str]]:
     lic_match = re.search(r"['\"]?license_code['\"]?\s*:\s*['\"]([^'\"]+)['\"]", page_html)
     license_code = lic_match.group(1) if lic_match else ""
@@ -1010,7 +993,6 @@ def extract_kvs_flashvars(page_html: str, base_url: str) -> list[tuple[str, int,
 
     return found
 
-
 def _is_valid_unblocked_html(text: str) -> bool:
     if not text or len(text) < 250:
         return False
@@ -1020,7 +1002,6 @@ def _is_valid_unblocked_html(text: str) -> bool:
     if "cf-browser-verification" in head or "_cf_chl_opt" in head:
         return False
     return True
-
 
 def fetch_html_parallel_race(url: str, uid: int) -> tuple[str, dict[str, str]]:
     """
@@ -1133,7 +1114,6 @@ def fetch_html_parallel_race(url: str, uid: int) -> tuple[str, dict[str, str]]:
 
     raise last_err or RuntimeError("Cloudflare blocked all fast pathways. Upload cookies via /cookies domain.com")
 
-
 def expand_hls_master_playlist(m3u8_url: str, referer: str, cookies: dict[str, str], uid: int) -> list[dict]:
     variants = []
     try:
@@ -1171,7 +1151,6 @@ def expand_hls_master_playlist(m3u8_url: str, referer: str, cookies: dict[str, s
         log.debug("HLS master playlist expansion skipped: %s", exc)
 
     return variants
-
 
 def generic_cffi_extract(url: str, uid: int = 0) -> dict:
     page_html, session_cookies = fetch_html_parallel_race(url, uid)
@@ -1307,7 +1286,6 @@ def generic_cffi_extract(url: str, uid: int = 0) -> dict:
         "_session_cookies": session_cookies,
     }
 
-
 def tiktok_fallback_extract(url: str) -> dict:
     if HAS_CURL_CFFI:
         resp = cffi_requests.post(
@@ -1383,7 +1361,6 @@ def tiktok_fallback_extract(url: str) -> dict:
         },
     }
 
-
 def resolve_fallback_stream_url(info: dict, selection: str) -> tuple[str, dict[str, str]]:
     if "|" in selection:
         fmt_id, height_str = selection.split("|", 1)
@@ -1418,6 +1395,249 @@ def resolve_fallback_stream_url(info: dict, selection: str) -> tuple[str, dict[s
         video_url = urls_map.get("best") or info.get("url")
 
     return video_url or "", fmt_headers
+
+
+# ==================== TURBO PARALLEL DOWNLOAD ENGINE ====================
+
+def _iter_chunks(resp):
+    if hasattr(resp, "iter_content"):
+        try:
+            return resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE)
+        except TypeError:
+            return resp.iter_content()
+    return None
+
+
+def _cffi_stream(video_url: str, headers: dict, session_cookies: dict, proxy, timeout=20):
+    resp = cffi_requests.get(
+        video_url,
+        impersonate="chrome110",
+        headers=headers,
+        cookies=session_cookies or None,
+        http_version=HTTP_V1_1,
+        proxy=proxy,
+        stream=True,
+        allow_redirects=True,
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    ctype = (resp.headers.get("content-type") or "").lower()
+    if "text/html" in ctype:
+        resp.close()
+        raise RuntimeError("CDN returned HTML instead of video stream.")
+    return resp
+
+
+def pick_fastest_proxy(video_url: str, headers: dict, session_cookies: dict):
+    """Race direct vs WARP with a 1MB probe and return the fastest pathway."""
+    if not HAS_CURL_CFFI:
+        return YTDLP_PROXY or None
+    if not YTDLP_PROXY:
+        return None
+
+    results: dict = {}
+
+    def _measure(proxy_val):
+        try:
+            start = time.monotonic()
+            resp = _cffi_stream(video_url, dict(headers), session_cookies, proxy_val, timeout=8)
+            try:
+                got = 0
+                for chunk in _iter_chunks(resp):
+                    if not chunk:
+                        continue
+                    got += len(chunk)
+                    if got >= SPEED_PROBE_BYTES:
+                        break
+                if got > 0:
+                    elapsed = max(0.001, time.monotonic() - start)
+                    results[proxy_val] = got / elapsed
+            finally:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+        except Exception as exc:
+            log.debug("Speed probe failed (proxy=%s): %s", proxy_val, exc)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        for candidate in (None, YTDLP_PROXY):
+            pool.submit(_measure, candidate)
+
+    if not results:
+        return YTDLP_PROXY
+    best = max(results.items(), key=lambda kv: kv[1])[0]
+    log.info(
+        "Pathway race: direct=%.0f KB/s, warp=%.0f KB/s -> %s",
+        results.get(None, 0) / 1024,
+        results.get(YTDLP_PROXY, 0) / 1024,
+        "WARP" if best else "direct",
+    )
+    return best
+
+
+def probe_content_size(video_url: str, headers: dict, session_cookies: dict, proxy):
+    """Ranged probe: returns (accepts_ranges, total_size)."""
+    probe_headers = dict(headers)
+    probe_headers["Range"] = "bytes=0-0"
+    resp = _cffi_stream(video_url, probe_headers, session_cookies, proxy, timeout=12)
+    try:
+        total = 0
+        cr = (resp.headers.get("content-range") or "").rsplit("/", 1)[-1]
+        if cr.isdigit():
+            total = int(cr)
+        accepts = resp.status_code == 206 and total > 0
+        return accepts, total
+    finally:
+        try:
+            resp.close()
+        except Exception:
+            pass
+
+
+def parallel_ranged_download(
+    video_url: str,
+    out_path: Path,
+    headers: dict,
+    session_cookies: dict,
+    proxy,
+    total_size: int,
+    uid: int,
+    download_hook,
+) -> None:
+    """
+    aria2-style multi-connection download:
+    - Splits the file into DOWNLOAD_WORKERS byte ranges
+    - Each worker streams its range straight into the correct file offset
+    - Per-part resume + retries with fresh Range requests
+    - Aggregated speed/ETA progress reporting
+    """
+    workers = max(2, min(DOWNLOAD_WORKERS, total_size // PARALLEL_MIN_SIZE + 1))
+    part_len = -(-total_size // workers)  # ceil division
+
+    ranges = []
+    offset = 0
+    while offset < total_size:
+        ranges.append((len(ranges), offset, min(offset + part_len - 1, total_size - 1)))
+        offset += part_len
+    workers = len(ranges)
+
+    state_path = out_path.with_name(out_path.name + ".parts.json")
+    progress = {i: 0 for i, _, _ in ranges}
+
+    # Resume support
+    if state_path.is_file() and out_path.is_file() and out_path.stat().st_size == total_size:
+        try:
+            saved = json.loads(state_path.read_text(encoding="utf-8"))
+            for k, v in (saved or {}).items():
+                try:
+                    progress[int(k)] = int(v)
+                except (KeyError, ValueError):
+                    pass
+        except Exception:
+            pass
+
+    # Preallocate target file
+    if not out_path.is_file() or out_path.stat().st_size != total_size:
+        with open(out_path, "wb") as f:
+            f.truncate(total_size)
+
+    progress_lock = threading.Lock()
+    counters = {
+        "done": sum(progress.values()),
+        "start": time.monotonic(),
+        "save": 0.0,
+        "report": 0.0,
+    }
+
+    def _cancel_check():
+        with active_lock:
+            job = active_jobs.get(uid)
+            if job and job["cancelled"].is_set():
+                raise JobCancelledError("Cancelled by user.")
+
+    def _report():
+        now = time.monotonic()
+        if now - counters["report"] < 0.5:
+            return
+        counters["report"] = now
+        with progress_lock:
+            done = counters["done"]
+        elapsed = max(0.001, now - counters["start"])
+        speed = done / elapsed if done else 0
+        download_hook({
+            "status": "downloading",
+            "downloaded_bytes": done,
+            "total_bytes": total_size,
+            "speed": speed,
+            "eta": int((total_size - done) / speed) if speed else None,
+        })
+
+    def _save_state():
+        now = time.monotonic()
+        if now - counters["save"] < 2.0:
+            return
+        counters["save"] = now
+        try:
+            with progress_lock:
+                snapshot = dict(progress)
+            state_path.write_text(json.dumps(snapshot), encoding="utf-8")
+        except OSError:
+            pass
+
+    def _download_part(part_idx: int, start: int, end: int):
+        part_total = end - start + 1
+        done = max(0, min(progress.get(part_idx, 0), part_total))
+        attempts = 0
+
+        while done < part_total:
+            _cancel_check()
+            attempts += 1
+            if attempts > PART_RETRIES:
+                raise RuntimeError(f"Range {part_idx} failed after {PART_RETRIES} retries.")
+
+            rng_headers = dict(headers)
+            rng_headers["Range"] = f"bytes={start + done}-{end}"
+
+            resp = _cffi_stream(video_url, rng_headers, session_cookies, proxy, timeout=30)
+            try:
+                if resp.status_code != 206:
+                    raise RuntimeError(f"CDN ignored Range (HTTP {resp.status_code}).")
+
+                fh = open(out_path, "r+b")
+                try:
+                    fh.seek(start + done)
+                    for chunk in _iter_chunks(resp):
+                        _cancel_check()
+                        if not chunk:
+                            continue
+                        fh.write(chunk)
+                        done += len(chunk)
+                        with progress_lock:
+                            progress[part_idx] = done
+                            counters["done"] += len(chunk)
+                        _report()
+                        _save_state()
+                finally:
+                    fh.close()
+            finally:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_download_part, i, s, e) for i, s, e in ranges]
+        try:
+            for fut in as_completed(futures):
+                fut.result()
+        except Exception:
+            for fut in futures:
+                fut.cancel()
+            raise
+
+    state_path.unlink(missing_ok=True)
+    download_hook({"status": "finished"})
 
 
 def direct_cffi_download(
@@ -1487,81 +1707,108 @@ def direct_cffi_download(
         )
     else:
         downloaded_ok = False
-        proxy_candidates = [YTDLP_PROXY, None] if YTDLP_PROXY else [None]
 
         if HAS_CURL_CFFI:
-            for prx in proxy_candidates:
-                if downloaded_ok:
-                    break
-                try:
-                    resp = cffi_requests.get(
-                        video_url,
-                        impersonate="chrome110",
-                        headers=headers,
-                        cookies=session_cookies or None,
-                        http_version=HTTP_V1_1,
-                        proxy=prx,
-                        stream=True,
-                        allow_redirects=True,
-                        timeout=30,
+            # TURBO 1) Race direct vs WARP — keep the fastest pathway
+            try:
+                best_proxy = pick_fastest_proxy(video_url, headers, session_cookies)
+            except Exception as exc:
+                log.debug("Pathway race skipped: %s", exc)
+                best_proxy = YTDLP_PROXY or None
+
+            # TURBO 2) aria2-style parallel ranged download (8x speed on throttled CDNs)
+            try:
+                accepts_ranges, total_size = probe_content_size(
+                    video_url, headers, session_cookies, best_proxy
+                )
+                if accepts_ranges and total_size >= PARALLEL_MIN_SIZE:
+                    parallel_ranged_download(
+                        video_url, raw_video_path, headers, session_cookies,
+                        best_proxy, total_size, uid, download_hook,
                     )
+                    downloaded_ok = (
+                        raw_video_path.is_file()
+                        and raw_video_path.stat().st_size > 20 * 1024
+                    )
+            except JobCancelledError:
+                raise
+            except Exception as exc:
+                log.debug("Parallel ranged download failed: %s", exc)
+                raw_video_path.unlink(missing_ok=True)
+                raw_video_path.with_name(raw_video_path.name + ".parts.json").unlink(missing_ok=True)
+
+            # TURBO 3) Single-stream fallback (bigger 1MB chunks now)
+            if not downloaded_ok:
+                tried = []
+                for prx in [best_proxy, YTDLP_PROXY, None]:
+                    if prx in tried:
+                        continue
+                    tried.append(prx)
                     try:
-                        resp.raise_for_status()
-                        ctype = (resp.headers.get("content-type") or "").lower()
-                        if "text/html" in ctype:
-                            raise RuntimeError("CDN returned HTML instead of video stream.")
+                        resp = cffi_requests.get(
+                            video_url,
+                            impersonate="chrome110",
+                            headers=headers,
+                            cookies=session_cookies or None,
+                            http_version=HTTP_V1_1,
+                            proxy=prx,
+                            stream=True,
+                            allow_redirects=True,
+                            timeout=30,
+                        )
+                        try:
+                            resp.raise_for_status()
+                            ctype = (resp.headers.get("content-type") or "").lower()
+                            if "text/html" in ctype:
+                                raise RuntimeError("CDN returned HTML instead of video stream.")
 
-                        total = int(resp.headers.get("content-length") or 0)
-                        done = 0
-                        start = time.monotonic()
+                            total = int(resp.headers.get("content-length") or 0)
+                            done = 0
+                            start = time.monotonic()
 
-                        with open(raw_video_path, "wb") as f:
-                            if hasattr(resp, "iter_content"):
-                                try:
-                                    iterator = resp.iter_content(chunk_size=65536)
-                                except TypeError:
-                                    iterator = resp.iter_content()
-
-                                for chunk in iterator:
-                                    with active_lock:
-                                        job = active_jobs.get(uid)
-                                        if job and job["cancelled"].is_set():
-                                            raise JobCancelledError("Cancelled by user.")
-                                    if not chunk:
-                                        continue
-                                    f.write(chunk)
-                                    done += len(chunk)
-                                    elapsed = max(0.001, time.monotonic() - start)
+                            with open(raw_video_path, "wb") as f:
+                                iterator = _iter_chunks(resp)
+                                if iterator is None:
+                                    content = resp.content
+                                    f.write(content)
+                                    done = len(content)
                                     download_hook({
                                         "status": "downloading",
                                         "downloaded_bytes": done,
-                                        "total_bytes": total,
-                                        "speed": done / elapsed,
-                                        "eta": int((total - done) / (done / elapsed)) if total and done else None,
+                                        "total_bytes": done,
+                                        "speed": done,
+                                        "eta": 0,
                                     })
-                            else:
-                                content = resp.content
-                                f.write(content)
-                                done = len(content)
-                                download_hook({
-                                    "status": "downloading",
-                                    "downloaded_bytes": done,
-                                    "total_bytes": done,
-                                    "speed": done,
-                                    "eta": 0,
-                                })
-                        if raw_video_path.is_file() and raw_video_path.stat().st_size > 20 * 1024:
-                            downloaded_ok = True
-                    finally:
-                        if hasattr(resp, "close"):
-                            try:
-                                resp.close()
-                            except Exception:
-                                pass
-                except JobCancelledError:
-                    raise
-                except Exception as cffi_exc:
-                    log.debug("curl_cffi stream (proxy=%s) failed: %s", prx, cffi_exc)
+                                else:
+                                    for chunk in iterator:
+                                        with active_lock:
+                                            job = active_jobs.get(uid)
+                                            if job and job["cancelled"].is_set():
+                                                raise JobCancelledError("Cancelled by user.")
+                                        if not chunk:
+                                            continue
+                                        f.write(chunk)
+                                        done += len(chunk)
+                                        elapsed = max(0.001, time.monotonic() - start)
+                                        download_hook({
+                                            "status": "downloading",
+                                            "downloaded_bytes": done,
+                                            "total_bytes": total,
+                                            "speed": done / elapsed,
+                                            "eta": int((total - done) / (done / elapsed)) if total and done else None,
+                                        })
+                            if raw_video_path.is_file() and raw_video_path.stat().st_size > 20 * 1024:
+                                downloaded_ok = True
+                        finally:
+                            if hasattr(resp, "close"):
+                                try:
+                                    resp.close()
+                                except Exception:
+                                    pass
+                    except JobCancelledError:
+                        raise
+                    except Exception as cffi_exc:
+                        log.debug("curl_cffi stream (proxy=%s) failed: %s", prx, cffi_exc)
 
         if not downloaded_ok:
             raise RuntimeError("HTTP 403 Forbidden or stream blocked by CDN.")
@@ -1648,7 +1895,6 @@ def extract_info(url: str, uid: int) -> dict:
     url_info_cache[url] = (time.time(), info)
     return info
 
-
 def run_ytdlp(options: dict, url: str):
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
@@ -1676,7 +1922,6 @@ def duration_text(seconds):
         if hours else f"{minutes}:{seconds:02d}"
     )
 
-
 def human_size(value):
     if value is None:
         return "Unknown"
@@ -1690,17 +1935,14 @@ def human_size(value):
 
     return "Unknown"
 
-
 def progress_bar(percent, width=14):
     filled = max(0, min(width, int(percent * width / 100)))
     return "█" * filled + "░" * (width - filled)
-
 
 def safe_filename(name):
     name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", name).strip(" .")
     name = re.sub(r"\s+", " ", name)[:140].strip()
     return name or "reclip-media"
-
 
 async def edit_progress(message, text, force=False, reply_markup=None):
     key = (message.chat.id, message.id)
@@ -1729,7 +1971,6 @@ def cancel_keyboard(uid: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("⛔ Cancel Download", callback_data=f"cancel:{uid}")]
     ])
 
-
 def format_keyboard(uid):
     return InlineKeyboardMarkup([
         [
@@ -1738,7 +1979,6 @@ def format_keyboard(uid):
         ],
         [InlineKeyboardButton("🔄 New link", callback_data="new")],
     ])
-
 
 def quality_keyboard(uid, qualities):
     rows = []
@@ -1814,7 +2054,6 @@ async def cookies_command(client, message):
     lines.append("\nUse /cookieinfo, /checkcookies URL, or /deletecookies domain.")
     await message.reply_text("\n".join(lines))
 
-
 @app.on_message(filters.private & filters.command("cookieinfo"))
 async def cookieinfo_command(client, message):
     profiles = cookie_profiles(message.from_user.id)
@@ -1845,7 +2084,6 @@ async def cookieinfo_command(client, message):
 
     lines.append("\nCookie values are never displayed.")
     await message.reply_text("\n".join(lines))
-
 
 @app.on_message(filters.private & filters.command("checkcookies"))
 async def checkcookies_command(client, message):
@@ -1890,7 +2128,6 @@ async def checkcookies_command(client, message):
             + "\nThe site may reject this session or require verification."
         )
 
-
 @app.on_message(filters.private & filters.command("deletecookies"))
 async def deletecookies_command(client, message):
     args = message.text.split(maxsplit=1)
@@ -1917,7 +2154,6 @@ async def deletecookies_command(client, message):
     await message.reply_text(
         f"🗑 Deleted <code>{html.escape(domain)}</code> cookie profile."
     )
-
 
 @app.on_message(filters.private & filters.document)
 async def cookie_upload_handler(client, message):
@@ -1998,9 +2234,10 @@ async def cookie_upload_handler(client, message):
 @app.on_message(filters.private & filters.command(["start", "help"]))
 async def start_handler(client, message):
     await message.reply_text(
-        "👋 <b>Welcome to ReClip (Ultra-Light Edition)</b>\n\n"
+        "👋 <b>Welcome to ReClip (Turbo Edition)</b>\n\n"
         "Send a media URL to select MP4 quality or MP3 audio.\n\n"
         "• ⚡ Instant Parallel Link Fetching\n"
+        "• 🚀 Turbo 8x Parallel Download Engine\n"
         "• 🎬 Smart Quality Selection + Exact Sizes\n"
         "• 🛠 Faststart Seekable MP4 + Auto Thumbnail\n"
         "• 🛑 Instant Force-Kill Cancel & Storage Cleanup\n"
@@ -2008,7 +2245,6 @@ async def start_handler(client, message):
         "• /cookieinfo · /checkcookies URL · /deletecookies\n"
         "• /cancel"
     )
-
 
 @app.on_message(filters.private & filters.command("cancel"))
 async def cancel_handler(client, message):
@@ -2635,5 +2871,5 @@ async def callback_handler(client, query):
 # ==================== START BOT ====================
 
 if __name__ == "__main__":
-    log.info("Starting ReClip Telegram bot (Ultra-Light 1GB RAM Edition)")
+    log.info("Starting ReClip Telegram bot (Turbo Download Edition)")
     app.run()
